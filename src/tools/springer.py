@@ -12,10 +12,7 @@ def get_springer_metadata(doi, api_key):
         response = urlopen(request).read().decode('utf-8')
         obj = json.loads(response)
     except HTTPError as err:
-        if err.code == 403:
-            print('api_key expires today, please change it to a valid one and start again')
-            raise
-        elif err.code == 404:
+        if err.code == 404:
             return {}
         else:
             raise

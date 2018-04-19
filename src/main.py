@@ -4,10 +4,10 @@ import sqlite3
 import json
 import os
 
-api_key = '39167b4e2411a032c6f68b771ba17795'
-# api_key = '042b48a75a1efd82a47b84139210095c'
-# api_key = 'b2fac16c0bbcf9351c7f207a65bb007d'
-# api_key = 'c2b4c947194af768b704959206c99fe2'
+api_keys = ['39167b4e2411a032c6f68b771ba17795',
+            '042b48a75a1efd82a47b84139210095c',
+            'b2fac16c0bbcf9351c7f207a65bb007d',
+            'c2b4c947194af768b704959206c99fe2']
 
 expected_article_amount = 5000
 
@@ -18,52 +18,62 @@ urls_path = os.path.join(data_path, 'article-urls.json')
 
 
 def main():
+    for key in api_keys:
+        try:
+            get_metadata(key, db_path, urls_path)
+        except Exception as err:
+            if isinstance(err, HTTPError) and err.code == 403:
+                continue
+            # todo: handle socket exception(host name not resolvable, timeout, etc.)
+            else:
+                raise
+    print('All keys expire for today, please try tomorrow or create a new one in Springer API.')
+
+
+def get_metadata(key, db_path, urls_path):
     conn = sqlite3.connect(db_path)
     create_table(conn)
 
     urls = json.load(open(urls_path))
     count = 0
-    length = min(expected_article_amount, len(urls))
-    for url in urls:
-        if count >= length:
-            break
 
+    for url in urls:
         try:
             scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
             doi = scigraph_entry['doi']
-            entries = get_entries(doi, api_key)
+            entries = get_entries(doi, key)
             entries['sg'] = scigraph_entry
             insert_entries(doi, entries, conn)
-        except HTTPError as err:
-            if err.code == 403:
-                break
-            else:
-                update_urls(urls, count, urls_path)
-                conn.close()
-                raise
-        except sqlite3.IntegrityError as err:
-            if err.args[0] == 'UNIQUE constraint failed: ARTICLES.DOI':
-                print('entry with doi {} already exists in the db'.format(doi))
-                count += 1
+            count += 1
+            print('metadata of the article {} is saved in the db'.format(doi))
+        except (Exception, KeyboardInterrupt) as err:
+            if isinstance(err, sqlite3.IntegrityError) and err.args[0] == 'UNIQUE constraint failed: ARTICLES.DOI':
                 continue
-            else:
+            if count == 0 and isinstance(err, HTTPError) and err.code == 403:
                 raise
-        except (OSError, KeyboardInterrupt):
-            update_urls(urls, count, urls_path)
             conn.close()
+            if count > 0:
+                update_urls(urls, count, urls_path)
             raise
 
-        print('metadata of the article {} is saved in the db'.format(doi))
-        count += 1
-
-    update_urls(urls, count, urls_path)
     conn.close()
+    update_urls(urls, count, urls_path)
+    print('Congratulations! All metadata fetched!')
+
+
+def count_entries(conn):
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM ARTICLES')
+    count = c.fetchone()[0]
+    c.close()
+    return count
 
 
 def update_urls(urls, count, urls_path):
     urls = urls[count:]
     with open(urls_path, 'w') as outfile:
         json.dump(urls, outfile)
+    print('urls in the input file is updated')
 
 
 def get_entries(doi, api_key):
