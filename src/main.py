@@ -1,5 +1,5 @@
 from src.tools import scigraph, springer, crossref
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import sqlite3
 import json
 import os
@@ -9,10 +9,10 @@ api_keys = ['39167b4e2411a032c6f68b771ba17795',
             'b2fac16c0bbcf9351c7f207a65bb007d',
             'c2b4c947194af768b704959206c99fe2']
 
-expected_article_amount = 5000
+total_article_amount = 349877
 
 current_path = os.path.abspath(os.path.dirname(__file__))
-data_path = os.path.join(current_path, "../data")
+data_path = os.path.join(current_path, '../data')
 db_path = os.path.join(data_path, 'articles.sqlite')
 urls_path = os.path.join(data_path, 'article-urls.json')
 
@@ -21,6 +21,8 @@ def main():
     for key in api_keys:
         try:
             get_metadata(key, db_path, urls_path)
+        except KeyboardInterrupt:
+            return
         except Exception as err:
             if isinstance(err, HTTPError) and err.code == 403:
                 continue
@@ -48,16 +50,16 @@ def get_metadata(key, db_path, urls_path):
             print('metadata of the article {} is saved in the db'.format(doi))
         except (Exception, KeyboardInterrupt) as err:
             if isinstance(err, sqlite3.IntegrityError) and err.args[0] == 'UNIQUE constraint failed: ARTICLES.DOI':
-                continue
-            if count == 0 and isinstance(err, HTTPError) and err.code == 403:
-                raise
+                existed = count_entries(conn)
+                count = len(urls) - (total_article_amount - existed)
+
             conn.close()
             if count > 0:
                 update_urls(urls, count, urls_path)
+
             raise
 
     conn.close()
-    update_urls(urls, count, urls_path)
     print('Congratulations! All metadata fetched!')
 
 
@@ -78,8 +80,17 @@ def update_urls(urls, count, urls_path):
 
 def get_entries(doi, api_key):
     # scigraph_entry = scigraph.get_scigraph_metadata(doi)
-    springer_entry = springer.get_springer_metadata(doi, api_key)
-    crossref_entry = crossref.get_crossref_metadata(doi)
+    try:
+        springer_entry = springer.get_springer_metadata(doi, api_key)
+        crossref_entry = crossref.get_crossref_metadata(doi)
+    except URLError as err:
+        if isinstance(err, HTTPError) and err.code == 403:
+            raise
+        print(err)
+        print('Retry getting entry from springer')
+        springer_entry = springer.get_springer_metadata(doi, api_key)
+        print('Retry getting entry from crossref')
+        crossref_entry = crossref.get_crossref_metadata(doi)
 
     # return {'sg': scigraph_entry, 'sp': springer_entry, 'cr': crossref_entry}
     return {'sp': springer_entry, 'cr': crossref_entry}

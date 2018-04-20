@@ -1,5 +1,5 @@
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import json
 
 
@@ -25,6 +25,13 @@ def get_crossref_metadata(doi):
             return {}
         else:
             raise
+    except URLError as err:
+        print(err)
+        print(err.reason)
+        print(type(err.reason))
+        print(err.errno)
+        print(type(err.errno))
+        raise
 
     entry = {}
 
