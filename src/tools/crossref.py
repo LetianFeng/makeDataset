@@ -20,18 +20,17 @@ def get_crossref_metadata(doi):
     try:
         response = urlopen(request).read().decode('utf-8')
         obj = json.loads(response)
-    except HTTPError as err:
-        if err.code == 404:
-            return {}
-        else:
-            raise
     except URLError as err:
+        if isinstance(err, HTTPError) and err.code == 404:
+            return {}
         print(err)
         print(err.reason)
         print(type(err.reason))
         print(err.errno)
         print(type(err.errno))
-        raise
+        print('Retry getting entry from crossref')
+        response = urlopen(request).read().decode('utf-8')
+        obj = json.loads(response)
 
     entry = {}
 

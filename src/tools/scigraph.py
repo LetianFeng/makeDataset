@@ -1,5 +1,5 @@
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import json
 
 
@@ -14,9 +14,17 @@ def get_scigraph_metadata_from_url(url):
     try:
         response = urlopen(request).read().decode('utf-8')
         objects = json.loads(response)['@graph']
-    except HTTPError as err:
-        print('Could not get response for the url', url, 'from SciGraph API with the error:', err)
-        return {}
+    except URLError as err:
+        if isinstance(err, HTTPError) and err.code == 404:
+            return {}
+        print(err)
+        print(err.reason)
+        print(type(err.reason))
+        print(err.errno)
+        print(type(err.errno))
+        print('Retry getting entry from scigraph')
+        response = urlopen(request).read().decode('utf-8')
+        objects = json.loads(response)['@graph']
 
     entry = {}
 

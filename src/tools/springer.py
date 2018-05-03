@@ -1,5 +1,5 @@
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import json
 
 
@@ -16,6 +16,20 @@ def get_springer_metadata(doi, api_key):
             return {}
         else:
             raise
+    except URLError as err:
+        if isinstance(err, HTTPError):
+            if err.code == 403:
+                raise
+            if err.code == 404:
+                return {}
+        print(err)
+        print(err.reason)
+        print(type(err.reason))
+        print(err.errno)
+        print(type(err.errno))
+        print('Retry getting entry from springer')
+        response = urlopen(request).read().decode('utf-8')
+        obj = json.loads(response)
 
     entry = {}
 

@@ -1,14 +1,16 @@
-from src.tools import scigraph, springer, crossref
-from urllib.error import HTTPError, URLError
+#!/usr/bin/python3
+
+import sys
+import argparse
+from tools import scigraph, springer, crossref
+from urllib.error import HTTPError
 import sqlite3
 import json
 import os
 
-api_keys = ['39167b4e2411a032c6f68b771ba17795',
-            '042b48a75a1efd82a47b84139210095c',
-            'b2fac16c0bbcf9351c7f207a65bb007d',
-            'c2b4c947194af768b704959206c99fe2']
-
+parser = argparse.ArgumentParser()
+parser.add_argument('--daily_amount', default=15000, type=int, help='daily access limit of the application key of the Springer API')
+parser.add_argument('--key', default='39167b4e2411a032c6f68b771ba17795', type=str, help='the application key of the Springer API')
 total_article_amount = 349877
 
 current_path = os.path.abspath(os.path.dirname(__file__))
@@ -17,22 +19,9 @@ db_path = os.path.join(data_path, 'articles.sqlite')
 urls_path = os.path.join(data_path, 'article-urls.json')
 
 
-def main():
-    for key in api_keys:
-        try:
-            get_metadata(key, db_path, urls_path)
-        except KeyboardInterrupt:
-            return
-        except Exception as err:
-            if isinstance(err, HTTPError) and err.code == 403:
-                continue
-            # todo: handle socket exception(host name not resolvable, timeout, etc.)
-            else:
-                raise
-    print('All keys expire for today, please try tomorrow or create a new one in Springer API.')
+def main(argv):
+    args = parser.parse_args(argv[1:])
 
-
-def get_metadata(key, db_path, urls_path):
     conn = sqlite3.connect(db_path)
     create_table(conn)
 
@@ -43,11 +32,14 @@ def get_metadata(key, db_path, urls_path):
         try:
             scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
             doi = scigraph_entry['doi']
-            entries = get_entries(doi, key)
+            entries = get_entries(doi, args.key)
             entries['sg'] = scigraph_entry
             insert_entries(doi, entries, conn)
             count += 1
-            print('metadata of the article {} is saved in the db'.format(doi))
+            if count < args.daily_amount:
+                print('article {} is saved in the db, {} entries left'.format(doi, args.daily_amount - count))
+            else:
+                break
         except (Exception, KeyboardInterrupt) as err:
             if isinstance(err, sqlite3.IntegrityError) and err.args[0] == 'UNIQUE constraint failed: ARTICLES.DOI':
                 existed = count_entries(conn)
@@ -56,7 +48,12 @@ def get_metadata(key, db_path, urls_path):
             conn.close()
             if count > 0:
                 update_urls(urls, count, urls_path)
-
+                
+            if isinstance(err, KeyboardInterrupt):
+                return
+            elif isinstance(err, HTTPError) and err.code == 403:
+                print('Springer key expires')
+                return
             raise
 
     conn.close()
@@ -80,17 +77,8 @@ def update_urls(urls, count, urls_path):
 
 def get_entries(doi, api_key):
     # scigraph_entry = scigraph.get_scigraph_metadata(doi)
-    try:
-        springer_entry = springer.get_springer_metadata(doi, api_key)
-        crossref_entry = crossref.get_crossref_metadata(doi)
-    except URLError as err:
-        if isinstance(err, HTTPError) and err.code == 403:
-            raise
-        print(err)
-        print('Retry getting entry from springer')
-        springer_entry = springer.get_springer_metadata(doi, api_key)
-        print('Retry getting entry from crossref')
-        crossref_entry = crossref.get_crossref_metadata(doi)
+    springer_entry = springer.get_springer_metadata(doi, api_key)
+    crossref_entry = crossref.get_crossref_metadata(doi)
 
     # return {'sg': scigraph_entry, 'sp': springer_entry, 'cr': crossref_entry}
     return {'sp': springer_entry, 'cr': crossref_entry}
@@ -177,4 +165,4 @@ def insert_entries(doi, entries, conn):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
