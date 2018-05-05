@@ -1,6 +1,7 @@
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 import json
+import dateutil.parser
 
 
 def get_scigraph_metadata(doi):
@@ -55,7 +56,15 @@ def load_article_info(obj, entry):
     if 'sg:abstract' in obj:
         entry['abstract'] = obj['sg:abstract']
     if 'sg:publicationDate' in obj:
-        entry['publication_date'] = obj['sg:publicationDate']['@value']
+        date_instance = obj['sg:publicationDate']
+        if isinstance(date_instance, dict):
+            entry['publication_date'] = obj['sg:publicationDate']['@value']
+        elif isinstance(date_instance, list):
+            dates = []
+            for d in date_instance:
+                dates.append(dateutil.parser.parse(d['@value']))
+            date = min(dates)
+            entry['publication_date'] = date.date().isoformat()
     elif 'sg:publicationYearMonth' in obj:
         entry['publication_date'] = obj['sg:publicationYearMonth']['@value']
     elif 'sg:publicationYear' in obj:
