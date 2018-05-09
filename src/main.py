@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 import sqlite3
 import json
 import os
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--daily_amount', default=15000, type=int, help='daily access limit of the application key of the Springer API')
@@ -37,7 +38,7 @@ def main(argv):
             insert_entries(doi, entries, conn)
             count += 1
             if count < args.daily_amount:
-                print('article {} is saved in the db, {} entries left'.format(doi, args.daily_amount - count))
+                print('{}, {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, args.daily_amount - count))
             else:
                 break
         except (Exception, KeyboardInterrupt) as err:
