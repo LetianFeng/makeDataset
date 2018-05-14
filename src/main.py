@@ -10,14 +10,17 @@ import os
 import time
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--daily_amount', default=15000, type=int, help='daily access limit of the application key of the Springer API')
-parser.add_argument('--key', default='39167b4e2411a032c6f68b771ba17795', type=str, help='the application key of the Springer API')
-total_article_amount = 349877
+parser.add_argument('--daily_amount', default=15000, type=int,
+                    help='daily access limit of the application key of the Springer API')
+parser.add_argument('--key', default='39167b4e2411a032c6f68b771ba17795', type=str,
+                    help='the application key of the Springer API')
+
+total_article_amount = 334089
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 data_path = os.path.join(current_path, '../data')
-db_path = os.path.join(data_path, 'articles.sqlite')
-urls_path = os.path.join(data_path, 'article-urls.json')
+db_path = os.path.join(data_path, '2015.sqlite')
+urls_path = os.path.join(data_path, '2015.json')
 
 
 def main(argv):
@@ -27,7 +30,11 @@ def main(argv):
     create_table(conn)
 
     urls = json.load(open(urls_path))
-    count = 0
+
+    existed = count_entries(conn)
+    urls = urls[existed:-1]
+
+    daily_amount = args.daily_amount
 
     for url in urls:
         try:
@@ -36,29 +43,27 @@ def main(argv):
             entries = get_entries(doi, args.key)
             entries['sg'] = scigraph_entry
             insert_entries(doi, entries, conn)
-            count += 1
-            if count < args.daily_amount:
-                print('{}, {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, args.daily_amount - count))
+            daily_amount -= 1
+            if daily_amount > -1:
+                print('{}, {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
             else:
+                print('daily amount is reached')
                 break
-        except (Exception, KeyboardInterrupt) as err:
-            if isinstance(err, sqlite3.IntegrityError) and err.args[0] == 'UNIQUE constraint failed: ARTICLES.DOI':
-                existed = count_entries(conn)
-                count = len(urls) - (total_article_amount - existed)
-
+        except HTTPError as err:
             conn.close()
-            if count > 0:
-                update_urls(urls, count, urls_path)
-                
-            if isinstance(err, KeyboardInterrupt):
-                return
-            elif isinstance(err, HTTPError) and err.code == 403:
+            if err.code == 403:
                 print('Springer key expires')
                 return
             raise
+        except (Exception, KeyboardInterrupt):
+            print(doi)
+            conn.close()
+            raise
+
+    if total_article_amount == count_entries(conn):
+        print('Congratulations! All metadata fetched!')
 
     conn.close()
-    print('Congratulations! All metadata fetched!')
 
 
 def count_entries(conn):
@@ -67,13 +72,6 @@ def count_entries(conn):
     count = c.fetchone()[0]
     c.close()
     return count
-
-
-def update_urls(urls, count, urls_path):
-    urls = urls[count:]
-    with open(urls_path, 'w') as outfile:
-        json.dump(urls, outfile)
-    print('urls in the input file is updated')
 
 
 def get_entries(doi, api_key):

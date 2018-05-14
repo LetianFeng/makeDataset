@@ -3,8 +3,8 @@ import json
 from rdflib import Graph
 
 # input parameters
-file_name = '2016.nt'
-n = 2
+file_name = '2015.nt'
+n = 334089
 
 # path settings
 current_path = os.path.abspath(os.path.dirname(__file__))

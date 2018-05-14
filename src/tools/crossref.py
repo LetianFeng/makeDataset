@@ -67,9 +67,12 @@ def load_authors(authors, entry):
                 name = "{} {}".format(author['given'], author['family'])
             elif 'given' in author:
                 name = author['given']
-            else:
+            elif 'family' in author:
                 name = author['family']
-            l.append(name)
+            else:
+                name = None
+            if name is not None:
+                l.append(name)
         entry['authors'] = l
 
 
