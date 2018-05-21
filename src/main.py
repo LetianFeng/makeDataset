@@ -37,12 +37,13 @@ def main(argv):
     daily_amount = args.daily_amount
 
     for url in urls:
+        doi = 'getting doi from scigraph API'
         try:
             scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
             doi = scigraph_entry['doi']
-            entries = get_entries(doi, args.key)
-            entries['sg'] = scigraph_entry
-            insert_entries(doi, entries, conn)
+            springer_entry = springer.get_springer_metadata(doi, args.key)
+            crossref_entry = crossref.get_crossref_metadata(doi)
+            insert_entries(conn, doi, scigraph_entry, springer_entry, crossref_entry)
             daily_amount -= 1
             if daily_amount > -1:
                 print('{}, {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
@@ -72,15 +73,6 @@ def count_entries(conn):
     count = c.fetchone()[0]
     c.close()
     return count
-
-
-def get_entries(doi, api_key):
-    # scigraph_entry = scigraph.get_scigraph_metadata(doi)
-    springer_entry = springer.get_springer_metadata(doi, api_key)
-    crossref_entry = crossref.get_crossref_metadata(doi)
-
-    # return {'sg': scigraph_entry, 'sp': springer_entry, 'cr': crossref_entry}
-    return {'sp': springer_entry, 'cr': crossref_entry}
 
 
 def create_table(conn):
@@ -121,11 +113,7 @@ def assign_if_exist_in_dict(s, d):
         return 'NULL'
 
 
-def insert_entries(doi, entries, conn):
-    sg = entries['sg']
-    sp = entries['sp']
-    cr = entries['cr']
-
+def insert_entries(conn, doi, sg, sp, cr):
     doi = json.dumps(doi)
     keywords = assign_if_exist_in_dict('keywords', sp)
     reference = assign_if_exist_in_dict('reference', cr)
