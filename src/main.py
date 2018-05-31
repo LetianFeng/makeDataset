@@ -17,6 +17,7 @@ def main(args):
     config = read_updated_config(args)
     key = config['springer_key']
     daily_amount = config['daily_amount']
+    retry = config['retry']
 
     conn = sqlite3.connect(config['db_path'])
     create_table_if_not_exists(conn)
@@ -28,32 +29,34 @@ def main(args):
     urls = urls[existed:-1]
 
     for url in urls:
-        doi = 'getting doi from scigraph API'
         try:
-            scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
-            doi = scigraph_entry['doi']
-            springer_entry = springer.get_springer_metadata(doi, key)
-            crossref_entry = crossref.get_crossref_metadata(doi)
-            insert_entries(conn, doi, scigraph_entry, springer_entry, crossref_entry)
-            daily_amount -= 1
-            if daily_amount > -1:
-                print('{} {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
-            else:
-                print('daily amount is reached')
-                break
-        except HTTPError as err:
-            conn.close()
-            if err.code == 403:
+            doi, scigraph_entry, springer_entry, crossref_entry = get_entries(url, key, retry)
+        except KeyboardInterrupt:
+            print('Keyboard Interrupt')
+            break
+        except Exception as err:
+            if isinstance(err, HTTPError) and err.code == 403:
                 print('Springer key expires')
-                return
-            raise
-        except (Exception, KeyboardInterrupt):
-            print(doi)
-            conn.close()
-            raise
+                break
+            else:
+                conn.close()
+                raise
 
-    if total_amount == count_entries(conn):
+        insert_entries(conn, doi, scigraph_entry, springer_entry, crossref_entry)
+        daily_amount -= 1
+
+        if daily_amount > -1:
+            print('{} {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
+        else:
+            print('daily amount is reached')
+            break
+
+    existed = count_entries(conn)
+
+    if total_amount == existed:
         print('Congratulations! All metadata fetched!')
+    else:
+        print('{} of {} fetched'.format(existed, total_amount))
 
     conn.close()
 
@@ -80,7 +83,6 @@ def count_entries(conn):
 
 
 def create_table_if_not_exists(conn):
-    # create the table
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS ARTICLES
                  (DOI               TEXT PRIMARY KEY NOT NULL,
@@ -108,6 +110,44 @@ def create_table_if_not_exists(conn):
                  CR_JOURNALBRAND    TEXT);''')
     c.close()
     conn.commit()
+
+
+def get_entries(url, key, n):
+    doi = None
+    scigraph_entry = None
+    springer_entry = None
+    crossref_entry = None
+
+    # try n times
+    for i in range(n + 1):
+        try:
+            if scigraph_entry is None:
+                scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
+                doi = scigraph_entry['doi']
+        except Exception as err:
+            # Server Internal Error at SciGraph side
+            if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504) and i < n:
+                print(err, 'try again')
+                continue
+            else:
+                raise
+
+    for i in range(n + 1):
+        if springer_entry is not None and crossref_entry is not None:
+            break
+        try:
+            if springer_entry is None:
+                springer_entry = springer.get_springer_metadata(doi, key)
+            if crossref_entry is None:
+                crossref_entry = crossref.get_crossref_metadata(doi)
+        except Exception as err:
+            if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504) and i < n:
+                print(err, 'try again')
+                continue
+            else:
+                raise
+
+    return doi, scigraph_entry, springer_entry, crossref_entry
 
 
 def assign_if_exist_in_dict(s, d):

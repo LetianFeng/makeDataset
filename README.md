@@ -3,7 +3,7 @@ This little program is used to gather metadata from 3 different scholarly public
 
 The current input is a json list of scigraph urls, the program resolves firstly the DOI from the SciGraph-response, and then requests metadata from the other 2 APIs based on the DOI.
 
-Please specify your configurations in the 'config.json', especially the key of Springer API, otherwise this program won't work at all. The config file should have the following format:
+Please specify your configurations in the 'config.json', especially the `springer_key`, without a valid key, this program cannot work at all. The config file should have the following format:
 
 ```json
 {
@@ -17,4 +17,5 @@ Please specify your configurations in the 'config.json', especially the key of S
 
 
 The program is currently still in development, the next feature is:
-setting a retry time to avoid frequently failure due to HTTPError 500 at the server side. 
+1. add feature --verbose and --log
+2. get metadata from 3 different APIs based on DOI instead of SciGraph-url

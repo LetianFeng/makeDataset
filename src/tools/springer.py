@@ -11,22 +11,10 @@ def get_springer_metadata(doi, api_key):
     try:
         response = urlopen(request).read().decode('utf-8')
         obj = json.loads(response)
-    except HTTPError as err:
-        if err.code == 404:
+    except Exception as err:
+        if isinstance(err, HTTPError) and err.code == 404:
             return {}
-        else:
-            raise
-    except URLError as err:
-        if isinstance(err, HTTPError) and (err.code == 403 or err.code == 404):
-            # key expires
-            if err.code == 403:
-                raise
-            else:
-                return {}
-        print(err)
-        print('Retry getting entry from springer')
-        response = urlopen(request).read().decode('utf-8')
-        obj = json.loads(response)
+        raise
 
     entry = {}
 

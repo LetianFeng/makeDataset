@@ -12,19 +12,10 @@ def get_scigraph_metadata(doi):
 def get_scigraph_metadata_from_url(url):
     request = Request(url)
     request.add_header('Accept', 'application/ld+json')
-    try:
-        response = urlopen(request).read().decode('utf-8')
-        objects = json.loads(response)['@graph']
-    except URLError as err:
-        if isinstance(err, HTTPError) and err.code == 404:
-            return {}
-        print(err)
-        print('Retry getting entry from scigraph')
-        response = urlopen(request).read().decode('utf-8')
-        objects = json.loads(response)['@graph']
+    response = urlopen(request).read().decode('utf-8')
+    objects = json.loads(response)['@graph']
 
     entry = {}
-
     for obj in objects:
         obj_type = obj['@type']
         if isinstance(obj_type, str):
