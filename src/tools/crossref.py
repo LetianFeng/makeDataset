@@ -1,5 +1,5 @@
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 import json
 
 

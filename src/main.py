@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import sys
 import argparse
 from tools import scigraph, springer, crossref
 from urllib.error import HTTPError
