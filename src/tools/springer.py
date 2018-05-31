@@ -17,16 +17,13 @@ def get_springer_metadata(doi, api_key):
         else:
             raise
     except URLError as err:
-        if isinstance(err, HTTPError):
+        if isinstance(err, HTTPError) and (err.code == 403 or err.code == 404):
+            # key expires
             if err.code == 403:
                 raise
-            if err.code == 404:
+            else:
                 return {}
         print(err)
-        print(err.reason)
-        print(type(err.reason))
-        print(err.errno)
-        print(type(err.errno))
         print('Retry getting entry from springer')
         response = urlopen(request).read().decode('utf-8')
         obj = json.loads(response)

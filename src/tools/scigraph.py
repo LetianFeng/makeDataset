@@ -19,10 +19,6 @@ def get_scigraph_metadata_from_url(url):
         if isinstance(err, HTTPError) and err.code == 404:
             return {}
         print(err)
-        print(err.reason)
-        print(type(err.reason))
-        print(err.errno)
-        print(type(err.errno))
         print('Retry getting entry from scigraph')
         response = urlopen(request).read().decode('utf-8')
         objects = json.loads(response)['@graph']

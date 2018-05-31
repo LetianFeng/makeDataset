@@ -24,10 +24,6 @@ def get_crossref_metadata(doi):
         if isinstance(err, HTTPError) and err.code == 404:
             return {}
         print(err)
-        print(err.reason)
-        print(type(err.reason))
-        print(err.errno)
-        print(type(err.errno))
         print('Retry getting entry from crossref')
         response = urlopen(request).read().decode('utf-8')
         obj = json.loads(response)

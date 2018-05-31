@@ -9,44 +9,35 @@ import json
 import os
 import time
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--daily_amount', default=15000, type=int,
-                    help='daily access limit of the application key of the Springer API')
-parser.add_argument('--key', default='39167b4e2411a032c6f68b771ba17795', type=str,
-                    help='the application key of the Springer API')
-
-total_article_amount = 334089
-
 current_path = os.path.abspath(os.path.dirname(__file__))
-data_path = os.path.join(current_path, '../data')
-db_path = os.path.join(data_path, '2015.sqlite')
-urls_path = os.path.join(data_path, '2015.json')
+project_root_path = os.path.join(current_path, '..')
 
 
-def main(argv):
-    args = parser.parse_args(argv[1:])
+def main(args):
+    config = read_updated_config(args)
+    key = config['springer_key']
+    daily_amount = config['daily_amount']
 
-    conn = sqlite3.connect(db_path)
-    create_table(conn)
+    conn = sqlite3.connect(config['db_path'])
+    create_table_if_not_exists(conn)
 
-    urls = json.load(open(urls_path))
+    urls = json.load(open(config['url_path']))
+    total_amount = len(urls)
 
     existed = count_entries(conn)
     urls = urls[existed:-1]
-
-    daily_amount = args.daily_amount
 
     for url in urls:
         doi = 'getting doi from scigraph API'
         try:
             scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
             doi = scigraph_entry['doi']
-            springer_entry = springer.get_springer_metadata(doi, args.key)
+            springer_entry = springer.get_springer_metadata(doi, key)
             crossref_entry = crossref.get_crossref_metadata(doi)
             insert_entries(conn, doi, scigraph_entry, springer_entry, crossref_entry)
             daily_amount -= 1
             if daily_amount > -1:
-                print('{}, {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
+                print('{} {} is saved, {} entries left'.format(time.strftime('%Y-%m-%d %H:%M:%S'), doi, daily_amount))
             else:
                 print('daily amount is reached')
                 break
@@ -61,10 +52,23 @@ def main(argv):
             conn.close()
             raise
 
-    if total_article_amount == count_entries(conn):
+    if total_amount == count_entries(conn):
         print('Congratulations! All metadata fetched!')
 
     conn.close()
+
+
+def read_updated_config(args):
+    config_file = os.path.join(project_root_path, 'config.json')
+    with open(config_file) as file:
+        config = json.load(file)
+    config['url_path'] = os.path.join(project_root_path, config['url_path'])
+    config['db_path'] = os.path.join(project_root_path, config['db_path'])
+
+    if args.daily_amount:
+        config['daily_amount'] = args.daily_amount
+
+    return config
 
 
 def count_entries(conn):
@@ -75,7 +79,7 @@ def count_entries(conn):
     return count
 
 
-def create_table(conn):
+def create_table_if_not_exists(conn):
     # create the table
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS ARTICLES
@@ -152,4 +156,10 @@ def insert_entries(conn, doi, sg, sp, cr):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    # parse arguments, update configurations
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--daily_amount', default=None, type=int,
+                        help='daily access limit of the application key of the Springer API')
+    parser.add_argument("--verbose", help="increase output verbosity",
+                        action="store_true")
+    main(parser.parse_args())
