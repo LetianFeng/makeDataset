@@ -3,7 +3,7 @@ from urllib.error import HTTPError
 import json
 
 
-def load_publication_date(message, entry):
+def load_publication_date(message):
     if 'published-online' in message:
         date = message['published-online']['date-parts'][0]
     elif 'published-print' in message:
@@ -36,7 +36,7 @@ def get_crossref_metadata(doi):
     if 'subject' in message:
         entry['concepts'] = message['subject']
     if 'published-online' in message or 'published-print' in message:
-        entry['publication_date'] = load_publication_date(message, entry)
+        entry['publication_date'] = load_publication_date(message)
     if 'type' in message:
         entry['type'] = message['type']
     if 'container-title' in message:
@@ -52,7 +52,7 @@ def get_crossref_metadata(doi):
 
 def load_authors(authors, entry):
     if len(authors) > 0:
-        l = []
+        author_list = []
         for author in authors:
             if 'name' in author:
                 name = author['name']
@@ -65,8 +65,8 @@ def load_authors(authors, entry):
             else:
                 name = None
             if name is not None:
-                l.append(name)
-        entry['authors'] = l
+                author_list.append(name)
+        entry['authors'] = author_list
 
 
 def load_reference(objs, entry):
