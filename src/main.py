@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 
 import argparse
-from tools import scigraph, springer, crossref, database
-from urllib.error import HTTPError, URLError
 import sqlite3
 import json
 import os
 import time
+
+from socket import timeout
+from tools import scigraph, springer, crossref, database
+from urllib.error import HTTPError, URLError
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 project_root_path = os.path.join(current_path, '..')
@@ -96,9 +98,10 @@ def get_metadata(url, key, n, verbose):
                 if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
                     print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
                     continue
-                elif isinstance(err, URLError):
+                if isinstance(err, URLError) or isinstance(err, timeout):
                     print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
                     continue
+            print('error: ', err, 'type: ', type(err))
             raise
 
     for i in range(n + 1):
@@ -119,9 +122,10 @@ def get_metadata(url, key, n, verbose):
                 if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
                     print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
                     continue
-                elif isinstance(err, URLError):
+                if isinstance(err, URLError) or isinstance(err, timeout):
                     print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
                     continue
+            print('error: ', err, 'type: ', type(err))
             raise
 
     return doi, scigraph_entry, springer_entry, crossref_entry
