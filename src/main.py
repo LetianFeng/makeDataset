@@ -2,7 +2,7 @@
 
 import argparse
 from tools import scigraph, springer, crossref, database
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import sqlite3
 import json
 import os
@@ -87,9 +87,12 @@ def get_metadata(url, key, n):
                 doi = scigraph_entry['doi']
         except Exception as err:
             # Server Internal Error at SciGraph side
-            if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504) and i < n:
+            if i < n and isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
                 print(err, 'try again')
                 continue
+            elif i < n and isinstance(err, URLError):
+                print(err, 'try again', 'err no. {}'.format(err.errno), 'err reason {}'.format(err.reason))
+                raise
             else:
                 raise
 
@@ -102,9 +105,12 @@ def get_metadata(url, key, n):
             if crossref_entry is None:
                 crossref_entry = crossref.get_crossref_metadata(doi)
         except Exception as err:
-            if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504) and i < n:
+            if i < n and isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
                 print(err, 'try again')
                 continue
+            elif i < n and isinstance(err, URLError):
+                print(err, 'try again', 'err no. {}'.format(err.errno), 'err reason {}'.format(err.reason))
+                raise
             else:
                 raise
 
