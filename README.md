@@ -17,5 +17,5 @@ Please specify your configurations in the 'config.json', especially the `springe
 
 
 The program is currently still in development, the next feature is:
-1. add feature --verbose and --log
+1. add feature --log
 2. get metadata from 3 different APIs based on DOI instead of SciGraph-url
