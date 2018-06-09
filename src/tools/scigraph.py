@@ -11,7 +11,7 @@ def get_scigraph_metadata(doi):
 def get_scigraph_metadata_from_url(url):
     request = Request(url)
     request.add_header('Accept', 'application/ld+json')
-    response = urlopen(request).read().decode('utf-8')
+    response = urlopen(request, timeout=2).read().decode('utf-8')
     objects = json.loads(response)['@graph']
 
     entry = {}

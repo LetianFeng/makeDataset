@@ -18,7 +18,7 @@ def get_crossref_metadata(doi):
     request = Request(url)
     request.add_header('Accept', 'application/json')
     try:
-        response = urlopen(request).read().decode('utf-8')
+        response = urlopen(request, timeout=2).read().decode('utf-8')
         obj = json.loads(response)
     except Exception as err:
         if isinstance(err, HTTPError) and err.code == 404:

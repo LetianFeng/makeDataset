@@ -17,6 +17,7 @@ def main(args):
     key = config['springer_key']
     daily_amount = config['daily_amount']
     retry = config['retry']
+    verbose = config['verbose']
 
     conn = sqlite3.connect(config['db_path'])
     database.create_table_if_not_exists(conn, 'ARTICLES')
@@ -29,7 +30,7 @@ def main(args):
 
     for url in urls:
         try:
-            values = get_metadata_values_to_insert(url, key, retry)
+            values = get_metadata_values_to_insert(url, key, retry, verbose)
         except KeyboardInterrupt:
             print('Keyboard Interrupt')
             break
@@ -70,10 +71,12 @@ def read_updated_config(args):
     if args.daily_amount:
         config['daily_amount'] = args.daily_amount
 
+    config['verbose'] = args.verbose
+
     return config
 
 
-def get_metadata(url, key, n):
+def get_metadata(url, key, n, verbose):
     doi = None
     scigraph_entry = None
     springer_entry = None
@@ -85,16 +88,18 @@ def get_metadata(url, key, n):
             if scigraph_entry is None:
                 scigraph_entry = scigraph.get_scigraph_metadata_from_url(url)
                 doi = scigraph_entry['doi']
+                if verbose:
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'got scigraph entry, doi {}'.format(doi))
         except Exception as err:
-            # Server Internal Error at SciGraph side
-            if i < n and isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
-                print(err, 'try again')
-                continue
-            elif i < n and isinstance(err, URLError):
-                print(err, 'try again', 'err no. {}'.format(err.errno), 'err reason {}'.format(err.reason))
-                raise
-            else:
-                raise
+            if i < n:
+                # Server Internal Error at SciGraph side
+                if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
+                    continue
+                elif isinstance(err, URLError):
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
+                    continue
+            raise
 
     for i in range(n + 1):
         if springer_entry is not None and crossref_entry is not None:
@@ -102,17 +107,22 @@ def get_metadata(url, key, n):
         try:
             if springer_entry is None:
                 springer_entry = springer.get_springer_metadata(doi, key)
+                if verbose:
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'got springer entry')
             if crossref_entry is None:
                 crossref_entry = crossref.get_crossref_metadata(doi)
+                if verbose:
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'got crossref entry')
         except Exception as err:
-            if i < n and isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
-                print(err, 'try again')
-                continue
-            elif i < n and isinstance(err, URLError):
-                print(err, 'try again', 'err no. {}'.format(err.errno), 'err reason {}'.format(err.reason))
-                raise
-            else:
-                raise
+            if i < n:
+                # Server Internal Error at SciGraph side
+                if isinstance(err, HTTPError) and (err.code == 500 or err.code == 504):
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
+                    continue
+                elif isinstance(err, URLError):
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), err, 'try again')
+                    continue
+            raise
 
     return doi, scigraph_entry, springer_entry, crossref_entry
 
@@ -124,9 +134,9 @@ def assign_if_exist_in_dict(s, d):
         return 'NULL'
 
 
-def get_metadata_values_to_insert(url, key, retry):
+def get_metadata_values_to_insert(url, key, retry, verbose):
     # get metadata from 3 APIs: scigraph, springer, crossref
-    doi, sg, sp, cr = get_metadata(url, key, retry)
+    doi, sg, sp, cr = get_metadata(url, key, retry, verbose)
 
     # extract values we need for our database
     doi = json.dumps(doi)
